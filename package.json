@@ -1,0 +1,10 @@
+{
+  "name": "lord-axshu-fb-downloader",
+  "version": "1.0.0",
+  "description": "Facebook Video Downloader by Lord Axshu",
+  "scripts": {
+    "build": "echo 'Building Lord Axshu Downloader...'"
+  },
+  "author": "Lord Axshu",
+  "license": "MIT"
+}
