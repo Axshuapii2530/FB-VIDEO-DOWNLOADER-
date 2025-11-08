@@ -82,6 +82,33 @@
             transform: translateY(-2px);
         }
         
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         .results {
             margin-top: 30px;
             display: none;
@@ -91,31 +118,92 @@
             background: #f8f9fa;
             border: 1px solid #e9ecef;
             border-radius: 8px;
-            padding: 15px;
+            padding: 20px;
             margin-bottom: 15px;
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .video-info {
+            flex: 1;
         }
         
         .quality-badge {
             background: #667eea;
             color: white;
-            padding: 5px 10px;
+            padding: 5px 15px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .quality-hd {
+            background: #28a745;
+        }
+        
+        .quality-sd {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .quality-4k {
+            background: #dc3545;
         }
         
         .download-btn {
             background: #28a745;
             color: white;
             border: none;
-            padding: 8px 15px;
+            padding: 10px 20px;
             border-radius: 5px;
             cursor: pointer;
             text-decoration: none;
             font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .download-btn:hover {
+            background: #218838;
+        }
+        
+        .url-display {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            word-break: break-all;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .success {
+            background: #d1edff;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #bee5eb;
+        }
+        
+        .metadata {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        .metadata-item {
+            margin: 5px 0;
         }
         
         .footer {
@@ -136,61 +224,177 @@
         <div class="content">
             <div class="input-group">
                 <input type="text" id="fbUrl" placeholder="Paste Facebook video URL here..." />
+                <small style="color: #666; margin-top: 5px; display: block;">
+                    Example: https://www.facebook.com/share/v/xxxxxxxxx/ or https://fb.watch/xxxxxxxxx/
+                </small>
             </div>
             
-            <button class="btn" onclick="downloadVideo()">Download Video</button>
+            <button class="btn" onclick="downloadVideo()" id="downloadBtn">Download Video</button>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 10px;">Fetching video links... Please wait</p>
+            </div>
+            
+            <div id="message"></div>
             
             <div id="results" class="results">
                 <h3>Download Links:</h3>
                 <div id="linksContainer"></div>
+                
+                <div class="metadata" id="metadata">
+                    <!-- Metadata will be inserted here -->
+                </div>
             </div>
         </div>
         
         <div class="footer">
-            &copy; 2025 Lord Axshu - Facebook Video Downloader
+            &copy; 2025 Lord Axshu - Facebook Video Downloader | Powered by Vercel
         </div>
     </div>
 
     <script>
         async function downloadVideo() {
-            const url = document.getElementById('fbUrl').value;
+            const url = document.getElementById('fbUrl').value.trim();
             const resultsDiv = document.getElementById('results');
             const linksContainer = document.getElementById('linksContainer');
+            const messageDiv = document.getElementById('message');
+            const loadingDiv = document.getElementById('loading');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const metadataDiv = document.getElementById('metadata');
+            
+            // Reset previous results
+            messageDiv.innerHTML = '';
+            linksContainer.innerHTML = '';
+            resultsDiv.style.display = 'none';
+            metadataDiv.innerHTML = '';
             
             if (!url) {
-                alert('Please enter a Facebook video URL');
+                showMessage('Please enter a Facebook video URL', 'error');
+                return;
+            }
+            
+            if (!isValidFacebookUrl(url)) {
+                showMessage('Please enter a valid Facebook video URL', 'error');
                 return;
             }
             
             try {
+                // Show loading
+                loadingDiv.style.display = 'block';
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = 'Downloading...';
+                
                 const response = await fetch(`/api/download?url=${encodeURIComponent(url)}`);
                 const data = await response.json();
                 
+                // Hide loading
+                loadingDiv.style.display = 'none';
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Download Video';
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch video data');
+                }
+                
                 if (data.error) {
-                    alert('Error: ' + data.error);
+                    showMessage('Error: ' + data.error, 'error');
                     return;
                 }
                 
-                // Display results
-                linksContainer.innerHTML = '';
-                data.links.forEach(link => {
-                    if (link.quality !== 'unknown') {
-                        const linkDiv = document.createElement('div');
-                        linkDiv.className = 'video-link';
-                        linkDiv.innerHTML = `
-                            <div>
-                                <span class="quality-badge">${link.quality.toUpperCase()}</span>
-                            </div>
-                            <a href="${link.url}" class="download-btn" target="_blank">Download</a>
-                        `;
-                        linksContainer.appendChild(linkDiv);
-                    }
-                });
+                if (!data.success) {
+                    showMessage('Failed to get video links: ' + (data.message || 'Unknown error'), 'error');
+                    return;
+                }
                 
+                // Display success message
+                showMessage('Video links fetched successfully!', 'success');
+                
+                // Display video links
+                if (data.links && data.links.length > 0) {
+                    displayVideoLinks(data.links);
+                } else {
+                    showMessage('No download links found for this video', 'error');
+                    return;
+                }
+                
+                // Display metadata
+                displayMetadata(data);
+                
+                // Show results
                 resultsDiv.style.display = 'block';
                 
             } catch (error) {
-                alert('Error fetching video data: ' + error.message);
+                loadingDiv.style.display = 'none';
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Download Video';
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function displayVideoLinks(links) {
+            const linksContainer = document.getElementById('linksContainer');
+            
+            links.forEach((link, index) => {
+                const linkDiv = document.createElement('div');
+                linkDiv.className = 'video-link';
+                
+                const qualityClass = `quality-${link.quality}`;
+                
+                linkDiv.innerHTML = `
+                    <div class="video-info">
+                        <div>
+                            <span class="quality-badge ${qualityClass}">${link.quality.toUpperCase()}</span>
+                            ${link.direct ? '<span style="color: #28a745; font-size: 12px;">✓ Direct Link</span>' : ''}
+                        </div>
+                        <div class="url-display">
+                            ${link.url.length > 80 ? link.url.substring(0, 80) + '...' : link.url}
+                        </div>
+                    </div>
+                    <a href="${link.url}" class="download-btn" target="_blank" download>
+                        Download ${link.quality.toUpperCase()}
+                    </a>
+                `;
+                linksContainer.appendChild(linkDiv);
+            });
+        }
+        
+        function displayMetadata(data) {
+            const metadataDiv = document.getElementById('metadata');
+            
+            metadataDiv.innerHTML = `
+                <h4>Video Information:</h4>
+                <div class="metadata-item"><strong>Video ID:</strong> ${data.video_id || 'N/A'}</div>
+                <div class="metadata-item"><strong>Source:</strong> ${data.source || 'N/A'}</div>
+                <div class="metadata-item"><strong>Fetched At:</strong> ${formatDate(data.fetched_at) || 'N/A'}</div>
+                ${data.message ? `<div class="metadata-item"><strong>Note:</strong> ${data.message}</div>` : ''}
+            `;
+        }
+        
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+        
+        function isValidFacebookUrl(url) {
+            const patterns = [
+                /https?:\/\/(www\.)?facebook\.com\/.+\/videos\/.+/,
+                /https?:\/\/(www\.)?facebook\.com\/.+\/video\.php\?.+/,
+                /https?:\/\/(www\.)?facebook\.com\/watch\/?(\?.*)?$/,
+                /https?:\/\/(www\.)?fb\.watch\/.+/,
+                /https?:\/\/(www\.)?facebook\.com\/share\/.+/
+            ];
+            
+            return patterns.some(pattern => pattern.test(url));
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleString();
+            } catch {
+                return dateString;
             }
         }
         
@@ -200,6 +404,9 @@
                 downloadVideo();
             }
         });
+        
+        // Auto-focus on input
+        document.getElementById('fbUrl').focus();
     </script>
 </body>
 </html>
